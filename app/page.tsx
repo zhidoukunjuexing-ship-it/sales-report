@@ -1,65 +1,170 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { InputForm } from '@/components/InputForm'
+import { ReportPreview } from '@/components/report/ReportPreview'
+import { PdfExportButton } from '@/components/PdfExportButton'
+import { KpiData, AnalysisResult } from '@/lib/types'
+
+type Entry = { date: string; memberName: string }
 
 export default function Home() {
+  const [report, setReport] = useState<{ data: KpiData; analysis: AnalysisResult } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [entries, setEntries] = useState<Entry[]>([])
+  const [loadingEntries, setLoadingEntries] = useState(true)
+
+  const fetchEntries = useCallback(async () => {
+    try {
+      const res = await fetch('/api/entries')
+      if (!res.ok) return
+      const data: KpiData[] = await res.json()
+      setEntries(data.map((d) => ({ date: d.date, memberName: d.memberName })))
+    } catch {
+      // サイレントフェイル
+    } finally {
+      setLoadingEntries(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchEntries()
+  }, [fetchEntries])
+
+  const handleSubmit = async (data: KpiData) => {
+    setLoading(true)
+    setError(null)
+    try {
+      // 分析
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ today: data, history: [] }),
+      })
+      if (!res.ok) throw new Error('分析に失敗しました')
+      const analysis: AnalysisResult = await res.json()
+      setReport({ data, analysis })
+
+      // Supabaseに保存
+      setSaving(true)
+      await fetch('/api/entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      fetchEntries()
+
+      setTimeout(() => {
+        document.getElementById('report-content')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '不明なエラー')
+    } finally {
+      setLoading(false)
+      setSaving(false)
+    }
+  }
+
+  const handleLoadEntry = async (entry: Entry) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/entries')
+      if (!res.ok) throw new Error('データ取得に失敗しました')
+      const all: KpiData[] = await res.json()
+      const data = all.find((d) => d.date === entry.date && d.memberName === entry.memberName)
+      if (!data) throw new Error('データが見つかりません')
+
+      const analyzeRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ today: data, history: [] }),
+      })
+      if (!analyzeRes.ok) throw new Error('分析に失敗しました')
+      const analysis: AnalysisResult = await analyzeRes.json()
+      setReport({ data, analysis })
+
+      setTimeout(() => {
+        document.getElementById('report-content')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '不明なエラー')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 print:hidden">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">営業分析レポート</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Sales Activity Report Generator</p>
+          </div>
+          {report && <PdfExportButton />}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-6 py-8">
+        {!report ? (
+          <div className="space-y-6">
+            {/* 過去データ一覧 */}
+            {!loadingEntries && entries.length > 0 && (
+              <div>
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">
+                  保存済みデータ
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {entries.map((e) => (
+                    <button
+                      key={`${e.date}_${e.memberName}`}
+                      onClick={() => handleLoadEntry(e)}
+                      className="text-left px-4 py-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                    >
+                      <p className="text-xs text-gray-400">{e.date}</p>
+                      <p className="text-sm font-bold text-gray-800">{e.memberName}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <div className="mb-4">
+                <h2 className="text-lg font-bold text-gray-700">新規入力</h2>
+                <p className="text-sm text-gray-400 mt-1">
+                  送信すると自動でSupabaseに保存されます。
+                </p>
+              </div>
+              <InputForm onSubmit={handleSubmit} loading={loading} />
+              {saving && (
+                <p className="mt-2 text-xs text-blue-500">Supabaseに保存中...</p>
+              )}
+              {error && (
+                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between mb-6 print:hidden">
+              <button
+                onClick={() => setReport(null)}
+                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+              >
+                ← 一覧に戻る
+              </button>
+              <PdfExportButton />
+            </div>
+            <ReportPreview data={report.data} analysis={report.analysis} />
+          </div>
+        )}
       </main>
     </div>
-  );
+  )
 }
