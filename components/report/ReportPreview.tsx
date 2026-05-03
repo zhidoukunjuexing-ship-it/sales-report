@@ -9,6 +9,7 @@ import { ProgressTracker } from './ProgressTracker'
 import { Top16Comparison } from './Top16Comparison'
 import { FunnelChart } from './FunnelChart'
 import { EfficiencyReport } from './EfficiencyReport'
+import { SameMonthComparison } from './SameMonthComparison'
 
 type Props = {
   data: KpiData
@@ -70,6 +71,7 @@ export function ReportPreview({ data, analysis }: Props) {
 
       <KpiSummary data={data} analysis={analysis} />
       <FunnelChart data={data} analysis={analysis} />
+      <SameMonthComparison data={data} analysis={analysis} />
       <Top16Comparison data={data} analysis={analysis} />
       <EfficiencyReport data={data} analysis={analysis} />
       <AutoAnalysis analysis={analysis} />

@@ -270,6 +270,7 @@ export function analyzeKpi(
   const actionItems = generateActionItems(issues)
   const progressRecords = trackProgress(issues, history)
   const efficiency = calcEfficiency(today, conversions)
+  const monthsActive = history.length + 1
 
   return {
     conversions,
@@ -281,6 +282,7 @@ export function analyzeKpi(
     winsStatus,
     summary: buildSummary(issues, thinkingDepth, winsStatus),
     efficiency,
+    monthsActive,
   }
 }
 

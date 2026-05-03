@@ -98,6 +98,7 @@ export type AnalysisResult = {
   winsStatus: 'good' | 'warning' | 'critical'
   summary: string
   efficiency: SalesEfficiency
+  monthsActive: number  // 稼働月数（history.length + 1）
 }
 
 export type KpiLabel = keyof Omit<KpiData, 'date' | 'memberName' | 'targets' | 'dailyReport'>
