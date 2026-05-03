@@ -213,6 +213,7 @@ function analyzeLosses(data: KpiData): LossAnalysis {
 
 function calcWinsStatus(data: KpiData): AnalysisResult['winsStatus'] {
   if (data.orders > 0) return 'good'
+  // 受注ゼロは常に warning 以上
   // フルトーク以降に到達しているのに受注ゼロ = critical
   if (data.inHomes > 0 || data.fullTalks > 0) return 'critical'
   return 'warning'
@@ -353,6 +354,111 @@ function detectIssues(
     })
   }
 
+  // ======================================================
+  // 【受注ルール】1日1件がマスト。受注ゼロは「終わり」
+  // ======================================================
+
+  // (a) 受注ゼロ → 常に critical（inhome_zero_orders / fulltalk_zero_inhomes と別IDで differentiate）
+  if (data.orders === 0) {
+    const alreadyHasInHomeIssue = issues.some(
+      (i) => i.id === 'inhome_zero_orders' || i.id === 'fulltalk_zero_inhomes',
+    )
+    if (!alreadyHasInHomeIssue) {
+      issues.unshift({
+        id: 'orders_zero',
+        severity: 'critical',
+        category: '受注ゼロ【本日終了】',
+        description: '本日受注ゼロ — 1日1件受注はマスト',
+        detail:
+          '1日1件の受注はミニマムマストです。今日は受注ゼロで終わっています。これは「終わり」の状態です。ファネルのどのステップで止まったかを今日中に特定し、明日の稼働前にリーダーへ報告・ロープレを実施してください。',
+        mentionedInReport: null,
+      })
+    }
+  }
+
+  // (b) 見込みを作ったなら必ず翌日以降に受注へ繋げること
+  if (data.prospects > 0 && data.orders === 0) {
+    issues.unshift({
+      id: 'prospects_no_orders',
+      severity: 'critical',
+      category: '見込みあり受注なし【要追撃】',
+      description: `見込み${data.prospects}件があるのに受注ゼロ`,
+      detail: `見込みを作ったならば、必ず受注まで持っていくことが原則です。見込み${data.prospects}件が受注に繋がっていません。「検討中」「前向き」で終わらせず、今日中に再訪・電話フォローの計画を立て、明日中に必ず受注を取ってください。見込みを見込みのまま放置することは認めません。`,
+      mentionedInReport: null,
+    })
+  }
+
+  // (c) 商談→見込みばかりで受注なし = 認めない
+  if (data.negotiations > 0 && data.prospects > 0 && data.orders === 0) {
+    // prospects_no_orders が既に追加されているのでメッセージを強化するためさらに追加
+    issues.unshift({
+      id: 'nego_no_orders',
+      severity: 'critical',
+      category: '商談・見込みあり受注ゼロ【論外】',
+      description: `商談${data.negotiations}件・見込み${data.prospects}件で受注ゼロ`,
+      detail: `商談まで設定し、見込みまで作りながら受注ゼロという状況は絶対に認められません。「商談して見込みになりました」は成果ではなく、受注になって初めて成果です。今日中にリーダーへ相談し、見込み客の落とし込みプランを具体的に立ててください。同じパターンを繰り返すのであればトーク全体を見直す必要があります。`,
+      mentionedInReport: null,
+    })
+  }
+
+  // ======================================================
+  // 【ファネル連動ルール】絶対数ベースの追加チェック
+  // ======================================================
+
+  // visits多い(>100)のにnet_face少ない(net_face/visits < 2%)
+  if (data.visits > 100) {
+    const interphoneRate = data.visits > 0 ? (data.interphones / data.visits) * 100 : 0
+    if (interphoneRate < 2) {
+      issues.push({
+        id: 'very_low_interphone',
+        severity: 'critical',
+        category: 'ピンポン数・エリア【深刻】',
+        description: `訪問${data.visits}件に対しインターホン応答が${interphoneRate.toFixed(1)}%（基準2%未満）`,
+        detail: `訪問数${data.visits}件という行動量があるにもかかわらず、インターホン応答率が${interphoneRate.toFixed(1)}%と極めて低い状態です。これはピンポン数が問題か、回っているエリアそのものに人がいない可能性が高いです。時間帯・エリアを根本から見直す必要があります。今日中にリーダーと「どこを・何時に・どう回るか」を再設計してください。`,
+        mentionedInReport: null,
+      })
+    }
+  }
+
+  // net_face多い(>20)のにmain_face少ない(main_face/net_face < 30%)
+  if (data.interphones > 20) {
+    const facingRate = data.interphones > 0 ? (data.facings / data.interphones) * 100 : 0
+    if (facingRate < 30) {
+      issues.push({
+        id: 'very_low_facing',
+        severity: 'critical',
+        category: 'インターホントーク【最悪レベル】',
+        description: `インターホン${data.interphones}件に対し対面率${facingRate.toFixed(1)}%（基準30%未満）`,
+        detail: `インターホンに${data.interphones}件応答してもらえているのに、対面（玄関に出てきてもらえる）率が${facingRate.toFixed(1)}%という状況はインターホントークが最悪レベルです。「玄関前に出てきてもらうための一言」が全く機能していません。今日稼働前に必ずリーダーとインターホントークの全文をロープレし、承認をもらってから出てください。`,
+        mentionedInReport: null,
+      })
+    }
+  }
+
+  // main_face多い(>10)のにpresentations=0（紙プレなし）
+  if (data.facings > 10 && data.presentations === 0) {
+    issues.push({
+      id: 'facing_no_presentation',
+      severity: 'warning',
+      category: '対面後アプローチ（紙プレ未実施）',
+      description: `対面${data.facings}件あるのに紙プレ0件`,
+      detail: `対面が${data.facings}件あるのに紙プレ（資料を使った商談入口）がゼロ件です。対面してからの第一声・アプローチで商談の入り口に進めていない状態です。対面→紙プレへの誘導トークをリーダーと確認してください。`,
+      mentionedInReport: null,
+    })
+  }
+
+  // negotiations>3かつorders=0
+  if (data.negotiations > 3 && data.orders === 0) {
+    issues.unshift({
+      id: 'nego_zero_orders',
+      severity: 'critical',
+      category: '商談設定後受注ゼロ【論外】',
+      description: `商談${data.negotiations}件設定して受注ゼロ`,
+      detail: `商談を${data.negotiations}件も設定できているのに受注がゼロという状況は論外です。商談設定までの力はあるのに、クロージング（決断を促す最後の一押し）が全くできていません。今日中にクロージングトークをリーダーと徹底的にロープレしてください。「商談した」は成果ではありません。「受注した」が成果です。`,
+      mentionedInReport: null,
+    })
+  }
+
   return issues
 }
 
@@ -377,7 +483,7 @@ function evaluateThinkingDepth(
     const mentioned = checkMentioned(report, issue.category)
     issue.mentionedInReport = mentioned
     if (!mentioned && issue.severity === 'critical') {
-      score -= 2
+      score -= 3
       unmentiond.push(issue.category)
     } else if (!mentioned && issue.severity === 'warning') {
       score -= 1
@@ -427,8 +533,8 @@ function evaluateThinkingDepth(
     label = 'shallow'
     feedback =
       unmentiond.length > 0
-        ? `数値上の課題（${unmentiond.join('、')}）に対して日報で言及がありません。振り返りが浅い可能性があります。思考の拡張が必要です。`
-        : '振り返りの深さが不十分です。課題の原因分析まで踏み込んでください。'
+        ? `数値上の課題（${unmentiond.join('、')}）に対して日報で言及がありません。課題に対して分析がなく、問題意識が見られません。今すぐリーダーに確認してください。`
+        : '課題に対して分析がなく、問題意識が見られません。今すぐリーダーに確認してください。'
   } else if (clamped <= 6) {
     label = 'average'
     feedback =
@@ -457,6 +563,13 @@ const MENTION_KEYWORDS: Record<string, string[]> = {
   '行動量（ピンポン数）': ['ピンポン', 'インターホン', '行動量'],
   '宅内失注【最重大】': ['失注', '宅内', '受注', '外的', '内的', '取れなかった', '断られ'],
   'フルトーク→宅内ゼロ【重大】': ['フルトーク', '宅内', '誘導', '中で', '入れなかった'],
+  '受注ゼロ【本日終了】': ['受注', '獲得', '決まらなかった', '取れなかった', '0件', 'ゼロ'],
+  '見込みあり受注なし【要追撃】': ['見込み', 'フォロー', '再訪', '落とし込み', '受注'],
+  '商談・見込みあり受注ゼロ【論外】': ['商談', '見込み', '受注', 'クロージング', '落とし込み'],
+  '商談設定後受注ゼロ【論外】': ['商談', '受注', 'クロージング', '落とし込み', '決め'],
+  'ピンポン数・エリア【深刻】': ['エリア', '時間帯', 'ピンポン', 'インターホン', '留守', '応答'],
+  'インターホントーク【最悪レベル】': ['インターホン', 'ピンポン', 'トーク', '玄関', '対面', 'ロープレ'],
+  '対面後アプローチ（紙プレ未実施）': ['紙プレ', '対面', 'アプローチ', '資料', '第一声'],
 }
 
 function checkMentioned(report: string, category: string): boolean {

@@ -6,6 +6,7 @@ import { AutoAnalysis } from './AutoAnalysis'
 import { DailyReportReview } from './DailyReportReview'
 import { ActionPlan } from './ActionPlan'
 import { ProgressTracker } from './ProgressTracker'
+import { Top16Comparison } from './Top16Comparison'
 
 type Props = {
   data: KpiData
@@ -66,6 +67,7 @@ export function ReportPreview({ data, analysis }: Props) {
       </div>
 
       <KpiSummary data={data} analysis={analysis} />
+      <Top16Comparison data={data} analysis={analysis} />
       <AutoAnalysis analysis={analysis} />
       <DailyReportReview data={data} analysis={analysis} />
       <ActionPlan analysis={analysis} />
