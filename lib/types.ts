@@ -65,6 +65,18 @@ export type ReportThinkingDepth = {
   feedback: string      // 例: "課題に対する原因分析が不足しています"
 }
 
+export type SalesEfficiency = {
+  visitsPerWin: number          // 訪問/獲得（低いほど良い）
+  efficiencyScore: number       // 1〜10スコア（TOP16比較）
+  salesStyle: 'volume' | 'precision' | 'balanced' | 'developing'
+  // volume: 訪問量で稼ぐタイプ（訪問>3000, 獲得率<15%）
+  // precision: 精度で稼ぐタイプ（獲得率>35%）
+  // balanced: 両立タイプ（ハイパフォーマー水準）
+  // developing: まだ水準に達していないタイプ
+  styleLabel: string            // 表示用ラベル
+  nextGoal: string              // 次の改善ポイント
+}
+
 // 失注分析（宅内・フルトーク以降で受注できなかったケースの要因分析）
 export type LossAnalysis = {
   estimatedInHomeLosses: number    // 宅内に入って受注できなかった件数（inHomes - orders）
@@ -85,6 +97,7 @@ export type AnalysisResult = {
   lossAnalysis: LossAnalysis
   winsStatus: 'good' | 'warning' | 'critical'
   summary: string
+  efficiency: SalesEfficiency
 }
 
 export type KpiLabel = keyof Omit<KpiData, 'date' | 'memberName' | 'targets' | 'dailyReport'>

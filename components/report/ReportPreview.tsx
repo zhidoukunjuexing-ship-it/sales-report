@@ -7,6 +7,8 @@ import { DailyReportReview } from './DailyReportReview'
 import { ActionPlan } from './ActionPlan'
 import { ProgressTracker } from './ProgressTracker'
 import { Top16Comparison } from './Top16Comparison'
+import { FunnelChart } from './FunnelChart'
+import { EfficiencyReport } from './EfficiencyReport'
 
 type Props = {
   data: KpiData
@@ -67,7 +69,9 @@ export function ReportPreview({ data, analysis }: Props) {
       </div>
 
       <KpiSummary data={data} analysis={analysis} />
+      <FunnelChart data={data} analysis={analysis} />
       <Top16Comparison data={data} analysis={analysis} />
+      <EfficiencyReport data={data} analysis={analysis} />
       <AutoAnalysis analysis={analysis} />
       <DailyReportReview data={data} analysis={analysis} />
       <ActionPlan analysis={analysis} />
@@ -76,7 +80,6 @@ export function ReportPreview({ data, analysis }: Props) {
       {/* フッター */}
       <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 text-center">
         このレポートは営業KPIと日報を元に自動生成されました。
-        判断軸はPhase2で定義・実装予定です。
       </div>
     </div>
   )

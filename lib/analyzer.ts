@@ -7,6 +7,7 @@ import {
   ProgressRecord,
   ReportThinkingDepth,
   LossAnalysis,
+  SalesEfficiency,
   FUNNEL_STEPS,
   FUNNEL_ISSUE_CATEGORY,
   KPI_LABELS,
@@ -33,11 +34,11 @@ import {
 // 実績PDFデータ（月10件以上エントリ7件）より再算出
 // TOP16集計: 訪問40,312件, ネット対面1,521件, 主権対面818件, 商談407件, 獲得122件
 const BENCHMARKS: Partial<Record<KpiLabel, number>> = {
-  // 訪問 → インターホン対面（ネット対面）: 2,577/65,284 = 3.9%
-  interphones: 4.0,
+  // 訪問 → インターホン対面（ネット対面）: ハイパフォーマー平均 4%
+  interphones: 4,
 
-  // インターホン → 対面（主権対面）: 818/1,521 = 53.8%
-  facings: 54.0,
+  // インターホン → 対面（主権対面）: ハイパフォーマー 55.4%
+  facings: 55,
 
   // 対面 → 紙プレ（データなし・将来設定）
   presentations: 0,
@@ -48,31 +49,31 @@ const BENCHMARKS: Partial<Record<KpiLabel, number>> = {
   // フルトーク/対面 → 宅内（将来設定）
   inHomes: 0,
 
-  // 主権対面 → 商談: 407/818 = 49.8%
-  negotiations: 50.0,
+  // 主権対面 → 商談: ハイパフォーマー 62.0%
+  negotiations: 62,
 
   // 商談 → 見込み（データなし・将来設定）
   prospects: 0,
 
-  // 商談/見込み → 受注（獲得）: 122/407 = 30.0%
-  orders: 30.0,
+  // 商談/見込み → 受注（獲得）: ハイパフォーマー 31.1%
+  orders: 31,
 }
 
 // =========================================================
 // トッププレイヤー比較データ（参考表示用）
 // =========================================================
-// TOP16集計（月10件以上エントリのみ）: 訪問330件/獲得, ネット対面12件/獲得, 主権対面7件/獲得, 商談3件/獲得
+// ハイパフォーマー集計（月10件以上エントリ, n=39）
 export const TOP_PLAYER_BENCHMARKS = {
-  // 1件獲得するために必要な訪問数
-  visitsPerWin: 330,
-  // 1件獲得するために必要な対面（主権対面）数
-  facingsPerWin: 7,
-  // 1件獲得するために必要な商談数
+  // 1件獲得するために必要な訪問数（ハイパフォーマー平均）
+  visitsPerWin: 243,
+  // 1件獲得するために必要な対面（主権対面）数: 3484/672 ≈ 5.2
+  facingsPerWin: 5,
+  // 1件獲得するために必要な商談数: 2160/672 ≈ 3.2
   negotiationsPerWin: 3,
-  // トップ月間平均獲得数（月10件以上エントリのみ）
+  // トップ月間平均獲得数
   avgMonthlyWins: 17,
-  // トップ月間平均訪問数
-  avgMonthlyVisits: 5759,
+  // トップ月間平均訪問数: 163583/39
+  avgMonthlyVisits: 4200,
 }
 
 // =========================================================
@@ -171,6 +172,44 @@ const ISSUE_LOGIC: Partial<Record<KpiLabel, {
 }
 
 // =========================================================
+// 営業効率スコア計算
+// =========================================================
+function calcEfficiency(data: KpiData, conversions: ConversionRate[]): SalesEfficiency {
+  const visitsPerWin = data.orders > 0 ? Math.round(data.visits / data.orders) : 9999
+
+  // 効率スコア: TOP16基準(243件)と比較。243件=10点、1168件=1点
+  const efficiencyScore = Math.max(1, Math.min(10, Math.round(10 - (visitsPerWin - 243) / 100)))
+
+  // 営業スタイル判定
+  const winRate = conversions.find(c => c.to === 'orders')?.rate ?? 0
+  const negoRate = conversions.find(c => c.to === 'negotiations')?.rate ?? 0
+
+  let salesStyle: SalesEfficiency['salesStyle']
+  let styleLabel: string
+  let nextGoal: string
+
+  if (winRate >= 35 && negoRate >= 55) {
+    salesStyle = 'precision'
+    styleLabel = '精度型（クロージング特化）'
+    nextGoal = '訪問量を増やせばさらに件数が跳ねます。現在の獲得率を維持しながら訪問数3,000件/月を目指してください。'
+  } else if (data.visits >= 3000 && winRate >= 25 && negoRate >= 55) {
+    salesStyle = 'balanced'
+    styleLabel = 'バランス型（TOP16水準）'
+    nextGoal = '訪問量・精度ともに高水準です。商談率・獲得率をさらに高め、訪問数を減らしながら獲得数を維持する「精度型」への進化を目指してください。'
+  } else if (data.visits >= 3000 && winRate < 20) {
+    salesStyle = 'volume'
+    styleLabel = '行動量型（訪問量でカバー）'
+    nextGoal = '訪問量は十分ですが、商談率・獲得率が低く効率が悪い状態です。同じ訪問量でも対面率55%・獲得率31%を目標にすると獲得数が1.5〜2倍になります。クロージングトークの改善を最優先にしてください。'
+  } else {
+    salesStyle = 'developing'
+    styleLabel = '成長中（基準以下）'
+    nextGoal = '訪問量と精度の両方が基準に達していません。まずは訪問量を2,000件/月に増やしながら、対面率55%・商談率62%を目標にしてください。'
+  }
+
+  return { visitsPerWin, efficiencyScore, salesStyle, styleLabel, nextGoal }
+}
+
+// =========================================================
 // 失注分析（フルトーク以降で受注できなかったケースの外的/内的要因判定）
 // =========================================================
 function analyzeLosses(data: KpiData): LossAnalysis {
@@ -230,6 +269,7 @@ export function analyzeKpi(
   const thinkingDepth = evaluateThinkingDepth(today.dailyReport, issues, lossAnalysis)
   const actionItems = generateActionItems(issues)
   const progressRecords = trackProgress(issues, history)
+  const efficiency = calcEfficiency(today, conversions)
 
   return {
     conversions,
@@ -240,6 +280,7 @@ export function analyzeKpi(
     lossAnalysis,
     winsStatus,
     summary: buildSummary(issues, thinkingDepth, winsStatus),
+    efficiency,
   }
 }
 
@@ -457,6 +498,40 @@ function detectIssues(
       detail: `商談を${data.negotiations}件も設定できているのに受注がゼロという状況は論外です。商談設定までの力はあるのに、クロージング（決断を促す最後の一押し）が全くできていません。今日中にクロージングトークをリーダーと徹底的にロープレしてください。「商談した」は成果ではありません。「受注した」が成果です。`,
       mentionedInReport: null,
     })
+  }
+
+  // ======================================================
+  // 【行動量依存・訪問効率チェック】
+  // ======================================================
+
+  // 行動量依存型: 訪問が多いのに獲得率が低い
+  if (data.visits >= 3000 && data.orders > 0) {
+    const winRate = data.negotiations > 0 ? (data.orders / data.negotiations) * 100 : 0
+    if (winRate < 15) {
+      issues.push({
+        id: 'volume_dependent',
+        severity: 'warning',
+        category: '行動量依存型（効率改善が必要）',
+        description: `訪問${data.visits}件あるが獲得率${winRate.toFixed(1)}%は低水準`,
+        detail: `訪問量${data.visits}件は十分ありますが、獲得率${winRate.toFixed(1)}%は低水準です。同じ訪問量でもクロージング精度を上げれば獲得数が2〜3倍になります。訪問量に頼った営業スタイルからの脱却が次のステップです。`,
+        mentionedInReport: null,
+      })
+    }
+  }
+
+  // 訪問効率が低い: 1件獲得に1,000件超の訪問が必要な状態
+  if (data.orders > 0) {
+    const vpw = Math.round(data.visits / data.orders)
+    if (vpw > 1000) {
+      issues.push({
+        id: 'low_visit_efficiency',
+        severity: 'warning',
+        category: '訪問効率が低い（1,000件超/獲得）',
+        description: `1件獲得に${vpw}件の訪問が必要（TOP16基準: 243件）`,
+        detail: `1件獲得するのに${vpw}件の訪問が必要な状態です（TOP16基準: 243件）。この差は商談率・獲得率の低さが原因です。`,
+        mentionedInReport: null,
+      })
+    }
   }
 
   return issues
