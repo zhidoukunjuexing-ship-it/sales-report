@@ -30,14 +30,14 @@ import {
 // good: benchmark × 110% 以上
 // warning: benchmark × 80% 以上 (good未満)
 // critical: benchmark × 80% 未満
+// 実績PDFデータ（2025.06〜2026.03、17エントリ）より再算出
+// TOP16集計: 訪問65,284件, ネット対面2,577件, 主権対面1,314件, 商談630件, 獲得145件
 const BENCHMARKS: Partial<Record<KpiLabel, number>> = {
-  // 訪問 → インターホン対面（ネット対面）
-  // トップ平均: 4.1% / 中央値: 4.2%
+  // 訪問 → インターホン対面（ネット対面）: 2,577/65,284 = 3.9%
   interphones: 4.0,
 
-  // インターホン → 対面（主権対面・ドアを開けてもらう）
-  // トップ平均: 59.9% / 中央値: 55.2%
-  facings: 60.0,
+  // インターホン → 対面（主権対面）: 1,314/2,577 = 51.0%
+  facings: 51.0,
 
   // 対面 → 紙プレ（データなし・将来設定）
   presentations: 0,
@@ -48,32 +48,31 @@ const BENCHMARKS: Partial<Record<KpiLabel, number>> = {
   // フルトーク/対面 → 宅内（将来設定）
   inHomes: 0,
 
-  // 宅内/対面 → 商談
-  // トップ平均: 62.1% / 中央値: 63.7%
-  negotiations: 62.0,
+  // 主権対面 → 商談: 630/1,314 = 47.9%
+  negotiations: 48.0,
 
   // 商談 → 見込み（データなし・将来設定）
   prospects: 0,
 
-  // 商談/見込み → 受注（獲得）
-  // トップ平均: 30.0% / 中央値: 22.9%
-  orders: 30.0,
+  // 商談/見込み → 受注（獲得）: 145/630 = 23.0%
+  orders: 23.0,
 }
 
 // =========================================================
 // トッププレイヤー比較データ（参考表示用）
 // =========================================================
+// TOP16集計: 訪問450件/獲得, ネット対面18件/獲得, 主権対面9件/獲得, 商談4件/獲得
 export const TOP_PLAYER_BENCHMARKS = {
-  // 1件獲得するために必要な訪問数（トップ中央値）
-  visitsPerWin: 250,
-  // 1件獲得するために必要な対面数
-  facingsPerWin: 14,
+  // 1件獲得するために必要な訪問数
+  visitsPerWin: 450,
+  // 1件獲得するために必要な対面（主権対面）数
+  facingsPerWin: 9,
   // 1件獲得するために必要な商談数
-  negotiationsPerWin: 5,
-  // トップ月間平均獲得数
-  avgMonthlyWins: 22,
+  negotiationsPerWin: 4,
+  // トップ月間平均獲得数（17エントリ平均）
+  avgMonthlyWins: 9,
   // トップ月間平均訪問数
-  avgMonthlyVisits: 3000,
+  avgMonthlyVisits: 3800,
 }
 
 // =========================================================
@@ -119,7 +118,7 @@ const ISSUE_LOGIC: Partial<Record<KpiLabel, {
     detail: (r, b) => `インターホンに出てくれた件数に対して、実際に玄関前まで出てきてもらえた割合が${r.toFixed(1)}%（基準${b}%）です。インターホン越しの会話で断られているケースが多い状態です。玄関先まで誘導するトーク・一言が機能していません。早急に改善が必要です。`,
     todayAction: '【最優先ロープレ】インターホン越しのトーク（最初の一言・誘導フレーズ）をリーダーと確認・練習する。「断られるパターン」を書き出して持っていく。',
     weekAction: 'インターホンで断られた際の相手の反応・言葉をメモし、断られパターン別の切り返しトークを週内に整備する。',
-    monthAction: '対面率を基準60%以上に引き上げることを月次KPIとし、インターホントークの精度を毎週見直す。',
+    monthAction: '対面率を基準51%以上に引き上げることを月次KPIとし、インターホントークの精度を毎週見直す。',
   },
   presentations: {
     category: '対面後のアプローチトーク',
@@ -151,7 +150,7 @@ const ISSUE_LOGIC: Partial<Record<KpiLabel, {
     detail: (r, b) => `宅内・対面数に対して商談（具体的な提案・検討）に進めた割合が${r.toFixed(1)}%（基準${b}%）です。対面・宅内まで進めているのに商談設定ができていない状態です。宅内でのトーク構成・ニーズ引き出しに問題があります。`,
     todayAction: '宅内でのトーク構成（ヒアリング〜提案の流れ）をリーダーと確認する。「商談に進めなかったパターン」を書き出す。',
     weekAction: '商談設定できた/できなかった件の違いを毎日記録し、成功パターンを積み上げる。',
-    monthAction: '商談率を基準62%以上に引き上げることを今月のKPIとし、宅内トークを週次で見直す。',
+    monthAction: '商談率を基準48%以上に引き上げることを今月のKPIとし、宅内トークを週次で見直す。',
   },
   prospects: {
     category: 'クロージングトーク【最優先改善】',
@@ -167,7 +166,7 @@ const ISSUE_LOGIC: Partial<Record<KpiLabel, {
     detail: (r, b) => `見込み件数に対して受注できた割合が${r.toFixed(1)}%（基準${b}%）です。見込みはできているのに受注に繋がっていない状態です。「前向きだけど決まらない」という状況が多い場合、落とし込みトークが甘く、最後の一押しができていないことが原因です。判断を相手に委ねすぎている可能性があります。`,
     todayAction: '見込み客への再訪・フォロー計画を立てる。「決め手になる一言」「背中を押すフレーズ」をリーダーに確認する。',
     weekAction: '見込みがあるのに受注できていないケースの理由を毎回記録し、「なぜ決まらなかったか」を分析して落とし込みトークを改善する。',
-    monthAction: '見込み→受注の転換率を基準30%以上に引き上げることを目標とし、落とし込みトークと再訪フォローの精度を高める。',
+    monthAction: '見込み→受注の転換率を基準23%以上に引き上げることを目標とし、落とし込みトークと再訪フォローの精度を高める。',
   },
 }
 
@@ -292,11 +291,9 @@ function detectIssues(
     const toLabel = KPI_LABELS[conv.to]
 
     if (conv.status === 'critical' || conv.status === 'warning') {
-      // urgency=immediate の場合は conv.status に関わらず critical 扱い
-      const forceCritical = logic?.urgency === 'immediate'
       issues.push({
         id: `conv_${conv.from}_${conv.to}`,
-        severity: forceCritical || conv.status === 'critical' ? 'critical' : 'warning',
+        severity: conv.status === 'critical' ? 'critical' : 'warning',
         category,
         description: `${fromLabel}→${toLabel}の転換率が低い（${conv.rate}% / 基準${conv.benchmark}%）`,
         detail: logic
